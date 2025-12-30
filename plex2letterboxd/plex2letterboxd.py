@@ -2,7 +2,6 @@
 import argparse
 import configparser
 import csv
-import re
 import sys
 
 from plexapi.server import PlexServer
@@ -38,34 +37,60 @@ def parse_config(ini):
     return auth
 
 
-def getImdbId(movie):
+def get_external_ids(movie):
+    """Extract IMDb and TMDB IDs from Plex GUIDs."""
+    imdb_id = None
+    tmdb_id = None
+
     for guid in (g.id for g in movie.guids):
-        if guid.startswith('imdb'):
-            return re.sub('^imdb://', '', guid)
-    return None
+        if guid.startswith('imdb://'):
+            imdb_id = guid.replace('imdb://', '')
+        elif guid.startswith('tmdb://'):
+            tmdb_id = guid.replace('tmdb://', '')
+
+    return imdb_id, tmdb_id
 
 
 def write_csv(sections, output, args):
     """Generate Letterboxd import CSV."""
     with open(output, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(['Title', 'Year', 'imdbID', 'Rating10', 'WatchedDate'])
+        writer.writerow([
+            'Title',
+            'Year',
+            'imdbID',
+            'tmdbID',
+            'Rating10',
+            'WatchedDate'
+        ])
 
         count = 0
         for section in sections:
-            filters = { 'unwatched': False }
+            filters = {'unwatched': False}
             if args.watched_after:
                 filters['lastViewedAt>>'] = args.watched_after
+
             for movie in section.search(sort='lastViewedAt', filters=filters):
-                imdbID = getImdbId(movie)
+                imdbID, tmdbID = get_external_ids(movie)
+
                 date = None
                 if movie.lastViewedAt is not None:
                     date = movie.lastViewedAt.strftime('%Y-%m-%d')
+
                 rating = movie.userRating
                 if rating is not None:
-                    rating = f'{movie.userRating:.0f}'
-                writer.writerow([movie.title, movie.year, imdbID, rating, date])
+                    rating = f'{rating:.0f}'
+
+                writer.writerow([
+                    movie.title,
+                    movie.year,
+                    imdbID,
+                    tmdbID,
+                    rating,
+                    date
+                ])
                 count += 1
+
     print(f'Exported {count} movies to {output}.')
 
 
@@ -74,13 +99,16 @@ def main():
     auth = parse_config(args.ini)
 
     plex = PlexServer(auth['baseurl'], auth['token'])
+
     if args.managed_user:
         myplex = plex.myPlexAccount()
         user = myplex.user(args.managed_user)
-        # Get the token for your machine.
         token = user.get_token(plex.machineIdentifier)
-        # Login to your server using your friend's credentials.
         plex = PlexServer(auth['baseurl'], token)
 
     sections = [plex.library.section(s) for s in args.sections]
     write_csv(sections, args.output, args)
+
+
+if __name__ == '__main__':
+    main()
