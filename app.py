@@ -33,20 +33,24 @@ def get_users():
     plex = PlexServer(BASEURL, TOKEN)
     account = plex.myPlexAccount()
 
-    users = [
-        {
-            "username": plex.account().username,
-            "managed": False
-        }
-    ]
+    users = []
 
+    # Always include the owner account
+    users.append({
+        "username": plex.account().username
+    })
+
+    # Include ONLY non-managed users
     for user in account.users():
+        if user.home:
+            continue  # skip managed users
+
         users.append({
-            "username": user.username,
-            "managed": user.home
+            "username": user.username
         })
 
     return users
+
 
 
 def export_csv(username):
