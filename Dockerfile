@@ -1,15 +1,10 @@
 FROM python:3.9-slim
 
 WORKDIR /app
-
-# Copy app files
 COPY . /app
 
-# Install runtime dependencies
-RUN pip install --no-cache-dir flask plexapi
+RUN pip install --no-cache-dir flask plexapi gunicorn
 
-# Flask runs on 5000 by default
 EXPOSE 5000
 
-# Run the web app
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-w", "2", "-b", "0.0.0.0:5000", "app:app"]
