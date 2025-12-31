@@ -3,3 +3,6 @@ config.ini
 env
 *.csv
 __pycache__
+.venv
+.venv/
+.venv\
